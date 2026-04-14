@@ -254,12 +254,6 @@ end
 FISHEOF
   info "Added sktoggle fish function"
 
-  # Also add to bash profile
-  local bashrc="$HOME/.bashrc"
-  if ! grep -q "alias sktoggle" "$bashrc" 2>/dev/null; then
-    echo 'alias sktoggle="~/.config/sketchybar/plugins/toggle_items.sh"' >> "$bashrc"
-    info "Added sktoggle bash alias"
-  fi
   ok "sktoggle ready — run 'sktoggle' to toggle sketchybar items"
 }
 
