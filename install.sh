@@ -243,6 +243,24 @@ setup_wm() {
   brew services stop sketchybar 2>/dev/null || true
   brew services start sketchybar
   ok "SketchyBar service started"
+
+  # ── sktoggle alias ──
+  local fish_fn_dir="$HOME/.config/fish/functions"
+  mkdir -p "$fish_fn_dir"
+  cat > "$fish_fn_dir/sktoggle.fish" << 'FISHEOF'
+function sktoggle --description "Toggle sketchybar items interactively"
+    ~/.config/sketchybar/plugins/toggle_items.sh
+end
+FISHEOF
+  info "Added sktoggle fish function"
+
+  # Also add to bash profile
+  local bashrc="$HOME/.bashrc"
+  if ! grep -q "alias sktoggle" "$bashrc" 2>/dev/null; then
+    echo 'alias sktoggle="~/.config/sketchybar/plugins/toggle_items.sh"' >> "$bashrc"
+    info "Added sktoggle bash alias"
+  fi
+  ok "sktoggle ready — run 'sktoggle' to toggle sketchybar items"
 }
 
 setup_shell() {
