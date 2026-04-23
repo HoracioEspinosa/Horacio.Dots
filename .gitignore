@@ -1,0 +1,17 @@
+# Claude Code session metadata (per-machine permissions + cached skills)
+.claude/
+
+# macOS cruft
+.DS_Store
+
+# Editor swap / temp files
+*~
+*.swp
+*.swo
+
+# Node artifacts (if anyone runs tooling inside the repo)
+node_modules/
+
+# Fish runtime artifacts (if the repo is ever cloned inside ~/.config/)
+fishd.tmp.*
+fish_history
