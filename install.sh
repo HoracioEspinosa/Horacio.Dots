@@ -324,6 +324,42 @@ setup_tmux() {
   fi
   tmux kill-server 2>/dev/null || true
   ok "Tmux configured (prefix = Ctrl+A)"
+
+  setup_fish_tmux_autoattach
+}
+
+# Prepend an auto-attach hook to ~/.config/fish/config.fish so opening a
+# new interactive terminal drops you straight into a tmux session named
+# `main` (attach if it exists, create otherwise). Idempotent via marker.
+setup_fish_tmux_autoattach() {
+  local fish_cfg="$HOME/.config/fish/config.fish"
+  local marker="# ─── Auto-attach to tmux ─── [managed by Horacio.Dots]"
+
+  mkdir -p "$(dirname "$fish_cfg")"
+  touch "$fish_cfg"
+
+  if grep -qF "$marker" "$fish_cfg" 2>/dev/null; then
+    ok "Fish tmux auto-attach already configured"
+    return
+  fi
+
+  local tmpfile
+  tmpfile="$(mktemp)"
+  cat > "$tmpfile" <<'FISHEOF'
+# ─── Auto-attach to tmux ─── [managed by Horacio.Dots]
+# Interactive shell + tmux on PATH + not already inside tmux → exec tmux.
+# `new-session -A -s main` attaches to session `main` or creates it.
+# `exec` replaces fish with tmux so the fish PID doesn't linger.
+if status is-interactive
+    and not set -q TMUX
+    and type -q tmux
+    exec tmux new-session -A -s main
+end
+
+FISHEOF
+  cat "$fish_cfg" >> "$tmpfile"
+  mv "$tmpfile" "$fish_cfg"
+  info "Added fish tmux auto-attach hook to $fish_cfg"
 }
 
 setup_editor() {
