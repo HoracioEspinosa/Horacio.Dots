@@ -99,10 +99,20 @@ ensure_homebrew() {
 }
 
 # ─── Helpers ───
+# brew_install: install $pkg if missing, upgrade if outdated. Skipping
+# when "already installed" produced the latent nvim-0.10.4 bug where
+# LazyVim required >= 0.11.12 but the installer never upgraded. Checking
+# `brew outdated` is cheap (cached) so the cost of this safety is low.
 brew_install() {
   local pkg="$1"
+  local name="${pkg##*/}"
   if brew list "$pkg" &>/dev/null; then
-    ok "$pkg already installed"
+    if brew outdated --formula "$name" &>/dev/null; then
+      info "Upgrading $pkg (outdated)..."
+      brew upgrade "$pkg" || warn "Failed to upgrade $pkg"
+    else
+      ok "$pkg already installed (up-to-date)"
+    fi
   else
     info "Installing $pkg..."
     brew install "$pkg" || warn "Failed to install $pkg"
@@ -112,7 +122,12 @@ brew_install() {
 brew_cask_install() {
   local pkg="$1"
   if brew list --cask "$pkg" &>/dev/null; then
-    ok "$pkg already installed"
+    if brew outdated --cask "$pkg" &>/dev/null; then
+      info "Upgrading $pkg (cask, outdated)..."
+      brew upgrade --cask "$pkg" || warn "Failed to upgrade $pkg"
+    else
+      ok "$pkg already installed (up-to-date)"
+    fi
   else
     info "Installing $pkg (cask)..."
     brew install --cask "$pkg" || warn "Failed to install $pkg"
@@ -147,7 +162,7 @@ install_wm() {
 
 install_shell() {
   header "Installing Shell"
-  for pkg in fish carapace zoxide atuin fzf; do
+  for pkg in fish carapace zoxide atuin fzf starship; do
     brew_install "$pkg"
   done
 }
@@ -274,6 +289,79 @@ setup_shell() {
   else
     ok "Fish is already the login shell"
   fi
+
+  # Deploy canonical fish configs (overlay — preserves user's personal files
+  # like conf.d/secrets.fish, conf.d/<user>-local.fish, functions/<user>-*.fish)
+  setup_fish_configs
+
+  # Starship prompt config
+  setup_starship
+}
+
+# Deploy fish configs from configs/fish/ to ~/.config/fish/ using overlay
+# semantics: existing files in the user's fish dir are NOT removed, only the
+# ones we ship get written. This preserves secrets.fish and any per-machine
+# overrides the user keeps out of version control.
+setup_fish_configs() {
+  local src="$CONFIGS_DIR/fish"
+  local dst="$HOME/.config/fish"
+
+  if [ ! -d "$src" ]; then
+    warn "Source not found: $src — skipping fish configs"
+    return
+  fi
+
+  mkdir -p "$dst"/{conf.d,functions,custom/scripts,themes,completions}
+
+  # Top-level entry points (overwrite — they're the source of truth)
+  [ -f "$src/config.fish" ]  && cp "$src/config.fish"  "$dst/config.fish"
+  [ -f "$src/fish_plugins" ] && cp "$src/fish_plugins" "$dst/fish_plugins"
+
+  # Shipped subdirs: copy each file individually so local files survive
+  for sub in conf.d functions themes; do
+    if [ -d "$src/$sub" ]; then
+      find "$src/$sub" -maxdepth 1 -type f -exec cp {} "$dst/$sub/" \;
+    fi
+  done
+
+  # custom/ — tree copy (scripts need exec bit preserved, so `cp -R`)
+  if [ -d "$src/custom" ]; then
+    cp -R "$src/custom/." "$dst/custom/"
+  fi
+
+  # completions/ — no-clobber (preserves carapace auto-generated ones)
+  if [ -d "$src/completions" ]; then
+    cp -Rn "$src/completions/." "$dst/completions/" 2>/dev/null || true
+  fi
+
+  info "Deployed fish configs to $dst (overlay — local files preserved)"
+
+  # Install fisher + declared plugins
+  if command -v fish &>/dev/null && [ -f "$dst/fish_plugins" ]; then
+    info "Bootstrapping fisher + declared plugins..."
+    fish -c '
+      if not functions -q fisher
+        curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source
+        fisher install jorgebucaran/fisher
+      end
+      fisher update
+    ' 2>&1 | tail -5 || warn "fisher update failed — run it manually later"
+    ok "Fisher plugins ready"
+  fi
+}
+
+# Deploy starship.toml prompt config (polyglot, ships with the repo).
+setup_starship() {
+  local src="$CONFIGS_DIR/starship.toml"
+  local dst="$HOME/.config/starship.toml"
+
+  if [ ! -f "$src" ]; then
+    warn "Source not found: $src — skipping starship"
+    return
+  fi
+
+  cp "$src" "$dst"
+  ok "Deployed starship.toml to $dst"
 }
 
 setup_terminal() {
