@@ -308,9 +308,21 @@ setup_tmux() {
     ok "TPM already installed"
   fi
 
-  # Install plugins via TPM
+  # Install plugins via TPM.
+  # install_plugins requires TMUX_PLUGIN_MANAGER_PATH to be set — that env var
+  # is populated only once tmux sources the config. We spin up a detached
+  # server, source the conf to export the var, then run the installer, then
+  # kill the server. Without this dance, install_plugins fails with
+  # "FATAL: Tmux Plugin Manager not configured in tmux.conf".
   info "Installing tmux plugins..."
-  "$HOME/.tmux/plugins/tpm/bin/install_plugins" 2>/dev/null || warn "Run 'prefix + I' inside tmux to install plugins"
+  if tmux start-server 2>/dev/null \
+     && tmux source-file "$HOME/.config/tmux/tmux.conf" 2>/dev/null \
+     && "$HOME/.tmux/plugins/tpm/bin/install_plugins"; then
+    ok "Tmux plugins installed"
+  else
+    warn "TPM install_plugins failed — open tmux and press 'prefix + I' to install manually"
+  fi
+  tmux kill-server 2>/dev/null || true
   ok "Tmux configured (prefix = Ctrl+A)"
 }
 
