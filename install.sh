@@ -180,7 +180,10 @@ install_tmux() {
 install_editor() {
   header "Installing Editor"
   brew_install neovim
+  # tree-sitter ships only the library as of v0.26; the CLI (required by
+  # nvim-treesitter to build parsers) lives in a separate formula.
   brew_install tree-sitter
+  brew_install tree-sitter-cli
 }
 
 install_dev() {
