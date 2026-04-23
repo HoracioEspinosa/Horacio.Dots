@@ -19,7 +19,7 @@ Select by number (space-separated) or type `all`:
 | # | Component | What it installs | Config |
 |---|-----------|-----------------|--------|
 | 1 | **Window Management** | yabai, skhd, sketchybar | Tiling WM + hotkeys + status bar |
-| 2 | **Shell** | fish, carapace, zoxide, atuin, fzf | Fish shell with completions, history search, fuzzy finder |
+| 2 | **Shell** | fish, carapace, zoxide, atuin, fzf, starship | Fish shell with completions, history search, fuzzy finder, polyglot prompt |
 | 3 | **Terminal** | ghostty | GPU-accelerated terminal with custom shaders and Gentleman theme |
 | 4 | **Multiplexer** | tmux + TPM | Terminal multiplexer with Kanagawa theme, vim navigation |
 | 5 | **Editor** | neovim, tree-sitter | Full LazyVim config with LSP, AI integrations, Oil file manager |
@@ -47,8 +47,26 @@ The installer automatically:
 - **zoxide** — Smarter `cd` that learns your most-used directories
 - **atuin** — Shell history stored in a SQLite database with full-text search
 - **fzf** — Fuzzy finder for files, history, and more
+- **starship** — Polyglot prompt (Node, Python, Rust, Go, Docker, git branch, etc.)
 
-The installer sets fish as your login shell.
+The installer:
+
+1. Adds fish to `/etc/shells` and sets it as your login shell (`chsh`)
+2. Deploys canonical fish configs to `~/.config/fish/` — `config.fish`, `conf.d/`, `functions/`, `themes/`, `custom/`, `fish_plugins`
+3. Bootstraps `fisher` and installs the declared plugins (fisher, nvm.fish, fzf.fish, plugin-pj)
+4. Drops `starship.toml` at `~/.config/starship.toml`
+
+**Customization without conflicts.** The fish deploy is overlay-style — `install.sh` copies shipped files but **never removes** files you added locally. The convention is:
+
+| Location | Who owns it | Goes into git? |
+|----------|-------------|----------------|
+| `~/.config/fish/config.fish` | The repo (source of truth) | Yes (this repo) |
+| `~/.config/fish/conf.d/<repo-file>.fish` | The repo (e.g. `nvm.fish`, `rustup.fish`) | Yes |
+| `~/.config/fish/conf.d/secrets.fish` | **You** — tokens, AWS creds, private env vars | **No — never commit** |
+| `~/.config/fish/conf.d/<yourname>-local.fish` | **You** — machine-specific PATHs, `$EDITOR`, etc. | Optional (personal repo) |
+| `~/.config/fish/functions/<yourname>-*.fish` | **You** — personal scripts (e.g. `vpn.fish`, `tst-*.fish`) | Optional (personal repo) |
+
+Since `conf.d/*.fish` is autoloaded alphabetically, your files layered on top of the shipped ones — a typical `conf.d/secrets.fish` just `set -Ux TOKEN "..."` and you're done.
 
 ### 3. Terminal (Ghostty)
 
@@ -85,7 +103,11 @@ Standard development toolchain and modern CLI replacements. See the component ta
 
 ## Re-running
 
-The installer is idempotent — it checks if packages are already installed before attempting installation. Safe to re-run at any time to update configs or add new components.
+The installer is idempotent and **auto-upgrades outdated packages**. On a re-run:
+
+- Packages already installed are checked via `brew outdated`; stale ones (e.g. neovim that needs to keep up with LazyVim's minimum) get `brew upgrade`d automatically
+- Config files shipped by this repo get re-deployed; your local additions under `conf.d/`, `functions/`, etc. are preserved
+- Fisher runs `fisher update` so plugin changes in `fish_plugins` take effect
 
 ```bash
 bash install.sh
